@@ -19,7 +19,10 @@
 	<category name="com.shico.cassandra.statistic">
 		<priority value="debug" />
 	</category>
-
+	<category name="me.prettyprint">
+		<priority value="info" />
+	</category>
+	
 	<root>
 		<priority value="debug" />
 		<appender-ref ref="console" />

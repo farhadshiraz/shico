@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +15,7 @@ import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
 import me.prettyprint.cassandra.serializers.LongSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.UUIDSerializer;
+import me.prettyprint.cassandra.service.CassandraHostConfigurator;
 import me.prettyprint.cassandra.utils.TimeUUIDUtils;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -31,9 +31,15 @@ import me.prettyprint.hector.api.factory.HFactory;
 import me.prettyprint.hector.api.mutation.Mutator;
 import me.prettyprint.hector.api.query.QueryResult;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 public class Trial {
+	private final static Log logger = LogFactory.getLog(Trial.class);
+	
     private static StringSerializer sse = StringSerializer.get();
     private static UUIDSerializer uuidse = UUIDSerializer.get();
+    private final static String CLUSTER_NAME = "Shico Cluster";
     private final static String COLUMN_FAMILY = "event";
     private final static String KEYSPACE = "statistic";
     
@@ -54,29 +60,22 @@ public class Trial {
 	 */
 	public static void main(String[] args) {
 		
-        Keyspace keyspace = HFactory.createKeyspace(KEYSPACE, getTestCluster());
+        Keyspace keyspace = HFactory.createKeyspace(KEYSPACE, getCluster());
     	
         try {
         	// Insert event records
+        	int recNum = 0;
             long now = System.currentTimeMillis();
-//            for (int i=1; i<=(NUMBER_OF_ROWS/BATCH_SIZE); i++) {
-//            	Mutator<UUID> mutator = HFactory.createMutator(keyspace, UUIDSerializer.get());
-//            	for (int j = 1; j <= BATCH_SIZE; j++) {
-//            		UUID rowKey = UUID.randomUUID();
-//            		addRandomEvents(mutator, rowKey, i*j, now-(i+j*5));
-//				}
-//            	mutator.execute();
-//			}
+            for (int i=1; i<=(NUMBER_OF_ROWS/BATCH_SIZE); i++) {
+            	Mutator<UUID> mutator = HFactory.createMutator(keyspace, UUIDSerializer.get());
+            	for (int j = 1; j <= BATCH_SIZE; j++) {
+            		UUID rowKey = UUID.randomUUID();
+            		addRandomEvents(mutator, rowKey, i*j, now-(i+j*5));
+            		logger.debug("Writing event number "+ (++recNum) + " with key: "+rowKey.toString());
+				}
+            	mutator.execute();
+			}
 
-            Mutator<UUID> mutator = HFactory.createMutator(keyspace, UUIDSerializer.get());
-            UUID key = UUID.randomUUID();
-            addStringColumn(mutator, key, "event_type", CHANNEL_CHANGE_STB);
-    		addStringColumn(mutator, key, "customer_ref", "cusotmer_"+1);
-    		addStringColumn(mutator, key, "channel_ref", "channel_"+1);
-    		addStringColumn(mutator, key, "device_ref", "device_"+1);
-    		addLongColumn(mutator, key, "duration", 1+100L);
-    		addDateColumn(mutator, key, "event_time", System.currentTimeMillis());
-    		mutator.execute();
             findByEventType(CHANNEL_CHANGE_STB, keyspace, "event_type", "customer_ref", "channel_ref", "device_ref", "duration", "event_time");
             
         } catch (HectorException he) {
@@ -84,23 +83,17 @@ public class Trial {
         }catch(Exception e){
         	e.printStackTrace();
         }finally{
-        	getTestCluster().getConnectionManager().shutdown();
+        	getCluster().getConnectionManager().shutdown();
         }
     }
 
-	private static Cluster getTestCluster(){
-        return HFactory.getOrCreateCluster("Test Cluster", "localhost:9160");		
+	private static Cluster getCluster(){
+        return HFactory.getOrCreateCluster(CLUSTER_NAME, new CassandraHostConfigurator("127.0.0.1,127.0.0.2,127.0.0.3"));		
 	}
 	
 	private static void findByEventType(String eventType, Keyspace keyspace, String...columnNames){
         IndexedSlicesQuery<UUID,String,ByteBuffer> query = HFactory.createIndexedSlicesQuery(keyspace, uuidse, StringSerializer.get(), ByteBufferSerializer.get());
         query.setColumnFamily(COLUMN_FAMILY);
-//        List<String> queryColumns = new ArrayList<String>();
-//        for (String colName : columnNames) {
-//			if(getColumnType(colName).equals("org.apache.cassandra.db.marshal.UTF8Type")){
-//				queryColumns.add(colName);
-//			}
-//		}
         query.setColumnNames(columnNames);
         query.addEqualsExpression("event_type", ByteBuffer.wrap(eventType.getBytes()));
         QueryResult<OrderedRows<UUID, String, ByteBuffer>> result = query.execute();
@@ -116,8 +109,8 @@ public class Trial {
 			}
         	sb.append("}\n");
 		}
-        System.out.println("Result: ");
-        System.out.println(sb.toString());		
+        logger.debug("Result: ");
+        logger.debug(sb.toString());		
 	}
 	
 	private static DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
@@ -142,7 +135,7 @@ public class Trial {
 	private static Map<String, String> getColumnDefinitions(){
 		if(columnDefinitions == null){
 			columnDefinitions = new HashMap<String, String>();
-			KeyspaceDefinition ksdef = getTestCluster().describeKeyspace(KEYSPACE);
+			KeyspaceDefinition ksdef = getCluster().describeKeyspace(KEYSPACE);
 			List<ColumnFamilyDefinition> cfDefs = ksdef.getCfDefs();
 			for (ColumnFamilyDefinition cfdef : cfDefs) {
 				if(cfdef.getName().equals(COLUMN_FAMILY)){

@@ -52,6 +52,12 @@
 
 	<repositories>
 		<repository>
+			<id>central</id>
+			<name>central</name>
+			<url>http://repo1.maven.org/maven2/</url>
+		</repository>
+	 
+		<repository>
 			<id>riptano</id>
 			<name>riptano</name>
 			<url>http://mvn.riptano.com/content/repositories/public/</url>
