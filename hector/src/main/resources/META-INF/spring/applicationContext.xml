@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.springframework.org/schema/beans
+http://www.springframework.org/schema/beans/spring-beans.xsd
+http://www.springframework.org/schema/context
+http://www.springframework.org/schema/context/spring-context-2.5.xsd">
+
+	<context:annotation-config />
+	<context:component-scan base-package="com.shico.cassandra" />
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath*:cassandra.properties</value>
+				<value>classpath*:application.properties</value>
+			</list>
+		</property>
+		<property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE" />
+	</bean>
+
+	<bean id="eventPersister" class="com.shico.cassandra.statistic.services.BatchInserterImpl">
+		<property name="columnFamily" value="${event.columnfamily}"/>
+	</bean>
+	
+	<bean id="keyspace" class="me.prettyprint.hector.api.factory.HFactory"
+		factory-method="createKeyspace">
+		<constructor-arg>
+			<value>${keyspace}</value>
+		</constructor-arg>
+		<constructor-arg>
+			<ref bean="cassandraCluster" />
+		</constructor-arg>
+	</bean>
+
+	<bean id="cassandraCluster" class="me.prettyprint.hector.api.factory.HFactory"
+		factory-method="getOrCreateCluster">
+		<constructor-arg>
+			<value>${cluster.name}</value>
+		</constructor-arg>
+		<constructor-arg>
+			<ref bean="cassandraHostConfigurator" />
+		</constructor-arg>
+	</bean>
+
+	<bean id="cassandraHostConfigurator"
+		class="me.prettyprint.cassandra.service.CassandraHostConfigurator">
+		<constructor-arg>
+			<value>${cluster.hosts}</value>
+		</constructor-arg>
+	</bean>
+</beans>
