@@ -9,9 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import me.prettyprint.cassandra.model.HColumnImpl;
-import me.prettyprint.cassandra.serializers.LongSerializer;
-import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.UUIDSerializer;
 import me.prettyprint.cassandra.utils.TimeUUIDUtils;
 import me.prettyprint.hector.api.Cluster;
@@ -24,19 +21,20 @@ import me.prettyprint.hector.api.exceptions.HectorException;
 import me.prettyprint.hector.api.factory.HFactory;
 import me.prettyprint.hector.api.mutation.Mutator;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
+import com.shico.cassandra.profiling.Profiler;
+
 public class BatchInserterImpl implements BatchInserter {
-	private static final Log logger = LogFactory.getLog(BatchInserterImpl.class);
+	private static final Logger logger = LoggerFactory.getLogger(BatchInserterImpl.class);
 	
 	private static DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
 	@Value("${keyspace}")
 	private String keyspaceName;
-//	@Autowired
 	private String columnFamily;
 	@Autowired
 	private Cluster cassandraCluster;
@@ -44,47 +42,25 @@ public class BatchInserterImpl implements BatchInserter {
 	private Keyspace keyspace;
 	
 	@Override
+	@Profiler("Mutator")
 	public void doBatchInsert() {
 		try{
 			getMutator().execute();
 		} catch (HectorException he) {
 			logger.error("Error in executing batch inserts. ", he);
 			throw new RuntimeException("Failed ot execute batch inserts.", he);
-		}finally{
-			cassandraCluster.getConnectionManager().shutdown();
 		}
 	}
 
-	@Override
-	public void addStringColumn(String name, String value) {
-        HColumn<String, String> col = new HColumnImpl<String, String>(StringSerializer.get(), StringSerializer.get());
-        col.setName(name);
-        col.setValue(value);
-        col.setClock(System.currentTimeMillis());
-        getMutator().addInsertion(UUID.randomUUID(), columnFamily, col);		
-	}
-
-	@Override
-	public void addLongColumn(String name, long value){
-		HColumn<String, Long> col = new HColumnImpl<String, Long>(StringSerializer.get(), LongSerializer.get());
-		col.setName(name);
-		col.setValue(value);
-		col.setClock(System.currentTimeMillis());
-		getMutator().addInsertion(UUID.randomUUID(), columnFamily, col);
-	}
 	
-	@Override
-	public void addDateColumn(String name, long value){
-		HColumn<String, UUID> col = new HColumnImpl<String, UUID>(StringSerializer.get(), UUIDSerializer.get());
-		col.setName(name);
-		col.setValue(TimeUUIDUtils.getTimeUUID(value));
-		col.setClock(System.currentTimeMillis());
-		getMutator().addInsertion(UUID.randomUUID(), columnFamily, col);
-	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public void addDateColumn(String name, Date value){
-		addDateColumn(name, value.getTime());
+	public void newRow(BatchRow row) {
+		List<HColumn> columns = row.getColumns();
+		for (HColumn col : columns) {			
+			getMutator().addInsertion(row.getKey(), columnFamily, col);
+		}
 	}
 
 	@Override
@@ -112,7 +88,7 @@ public class BatchInserterImpl implements BatchInserter {
 		return byteBufferAsString(column.getValue());
 	}
 
-	private static Map<String, String> columnDefinitions = new HashMap<String, String>();
+	private static Map<String, String> columnDefinitions = null;
 	private Map<String, String> getColumnDefinitions(){
 		if(columnDefinitions == null){
 			columnDefinitions = new HashMap<String, String>();
@@ -158,5 +134,23 @@ public class BatchInserterImpl implements BatchInserter {
 		this.columnFamily = columnFamily;
 	}
 
-	
+	@Override
+	public boolean isRunning() {
+		return false;
+	}
+
+	@Override
+	public void start() {
+		// get column metadata
+		getColumnDefinitions();
+	}
+
+	@Override
+	public void stop() {
+		if(cassandraCluster != null){
+			mutator = null;
+			columnDefinitions = null;
+			cassandraCluster.getConnectionManager().shutdown();
+		}
+	}	
 }

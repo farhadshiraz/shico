@@ -15,6 +15,8 @@ import me.prettyprint.hector.api.beans.Row;
 import me.prettyprint.hector.api.factory.HFactory;
 import me.prettyprint.hector.api.query.QueryResult;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +30,7 @@ import com.shico.cassandra.statistic.domain.WidgetActivationEvent;
 
 @Service
 public class StatEventServiceImpl implements StatEventService {
+	private final static Logger logger = LoggerFactory.getLogger(StatEventServiceImpl.class);
 
 	@Value("${event.columnfamily}")
 	private String columnFamily;
@@ -35,7 +38,7 @@ public class StatEventServiceImpl implements StatEventService {
 	private Keyspace keyspace;
 	@Autowired
 	@Qualifier("eventPersister")
-    private BatchInserter eventPersister;
+	private BatchInserter eventPersister;
 
 	@Override
 	public void executeBatchInserts() {
@@ -44,59 +47,93 @@ public class StatEventServiceImpl implements StatEventService {
 
 	@Override
 	public void addChannelChangeEvent(ChannelChangeEvent event) {
-		eventPersister.addStringColumn("event_type", event.eventType.name());
-		eventPersister.addStringColumn("customer_ref", event.customerRef);
-		eventPersister.addStringColumn("channel_ref", event.channelRef);
-		eventPersister.addStringColumn("device_ref", event.deviceModel);
-		eventPersister.addLongColumn("duration", event.duration);
-		eventPersister.addDateColumn("event_time", event.eventTime);
+		BatchRow row = new BatchRowImpl();
+		row.addStringColumn("event_type", event.eventType.name());
+		row.addStringColumn("customer_ref", event.customerRef);
+		row.addStringColumn("channel_ref", event.channelRef);
+		row.addStringColumn("device_ref", event.deviceRef);
+		row.addStringColumn("device_model", event.deviceModel);
+		row.addDateColumn("event_time", event.eventTime);
+		eventPersister.newRow(row);
 	}
 
 	@Override
 	public void addWidgetActivateEvent(WidgetActivationEvent event) {
-		eventPersister.addStringColumn("event_type", event.eventType.name());
-		eventPersister.addStringColumn("customer_ref", event.customerRef);
-		eventPersister.addStringColumn("device_ref", event.deviceRef);
-		eventPersister.addStringColumn("widget", event.widget);
-		eventPersister.addDateColumn("event_time", event.eventTime);
+		BatchRow row = new BatchRowImpl();
+		row.addStringColumn("event_type", event.eventType.name());
+		row.addStringColumn("customer_ref", event.customerRef);
+		row.addStringColumn("device_ref", event.deviceRef);
+		row.addStringColumn("widget", event.widget);
+		row.addDateColumn("event_time", event.eventTime);
+		eventPersister.newRow(row);
 	}
 
 	@Override
 	public void addWebtvLoginEvent(WebtvLoginEvent event) {
-		eventPersister.addStringColumn("event_type", event.eventType.name());
-		eventPersister.addStringColumn("customer_ref", event.customerRef);
-		eventPersister.addStringColumn("device_model", event.deviceModel);
-		eventPersister.addDateColumn("event_time", event.eventTime);
-		eventPersister.addStringColumn("webtv_session_id", event.webtvSessionId);
-		eventPersister.addStringColumn("webtv_username", event.webtvUsername);	
+		BatchRow row = new BatchRowImpl();
+		row.addStringColumn("event_type", event.eventType.name());
+		row.addStringColumn("customer_ref", event.customerRef);
+		row.addStringColumn("device_model", event.deviceModel);
+		row.addDateColumn("event_time", event.eventTime);
+		row.addStringColumn("webtv_session_id", event.webtvSessionId);
+		row.addStringColumn("webtv_username", event.webtvUsername);
+		eventPersister.newRow(row);
 	}
 
 	@Override
 	public void addWebtvChannelChangeEvent(WebtvChannelChangeEvent event) {
-		eventPersister.addStringColumn("event_type", event.eventType.name());
-		eventPersister.addStringColumn("customer_ref", event.channelRef);
-		eventPersister.addStringColumn("channel_ref", event.channelRef);
-		eventPersister.addStringColumn("webtv_session_id", event.webtvSessionId);
-		eventPersister.addStringColumn("webtv_username", event.webtvUsername);
-		eventPersister.addStringColumn("device_model", event.deviceModel);
-		eventPersister.addLongColumn("duration", event.duration);
-		eventPersister.addDateColumn("event_time", event.eventTime);
+		BatchRow row = new BatchRowImpl();
+		row.addStringColumn("event_type", event.eventType.name());
+		row.addStringColumn("customer_ref", event.channelRef);
+		row.addStringColumn("channel_ref", event.channelRef);
+		row.addStringColumn("webtv_session_id", event.webtvSessionId);
+		row.addStringColumn("webtv_username", event.webtvUsername);
+		row.addStringColumn("device_model", event.deviceModel);
+		row.addLongColumn("duration", event.duration);
+		row.addDateColumn("event_time", event.eventTime);
+		eventPersister.newRow(row);
 	}
 
 	@Override
-	public List<Row<UUID, String, ByteBuffer>> findByEventType(EventType eventType, String...columnNames){
-        IndexedSlicesQuery<UUID,String,ByteBuffer> query = HFactory.createIndexedSlicesQuery(keyspace, UUIDSerializer.get(), StringSerializer.get(), ByteBufferSerializer.get());
-        query.setColumnFamily(columnFamily);
-        query.setColumnNames(columnNames);
-        query.addEqualsExpression("event_type", ByteBuffer.wrap(eventType.name().getBytes()));
-        QueryResult<OrderedRows<UUID, String, ByteBuffer>> result = query.execute();
-                    
-        return result.get().getList();
+	public List<Row<UUID, String, ByteBuffer>> findByEventType(
+			EventType eventType, String startKey, int pageSize,
+			String... columnNames) {
+		IndexedSlicesQuery<UUID, String, ByteBuffer> query = HFactory
+				.createIndexedSlicesQuery(keyspace, UUIDSerializer.get(),
+						StringSerializer.get(), ByteBufferSerializer.get());
+		query.setColumnFamily(columnFamily);
+		query.setColumnNames(columnNames);
+		query.setRange(startKey, "", false, columnNames.length);
+		query.setRowCount(pageSize);
+		query.addEqualsExpression("event_type",
+				ByteBuffer.wrap(eventType.name().getBytes()));
+		QueryResult<OrderedRows<UUID, String, ByteBuffer>> result = query
+				.execute();
+
+		logger.info("Query was performed on " + result.getHostUsed()
+				+ " and took " + result.getExecutionTimeMicro()
+				+ " microseconds");
+
+		return result.get().getList();
 	}
 
 	@Override
 	public String columnsAsString(List<HColumn<String, ByteBuffer>> columnList) {
 		return eventPersister.columnsAsString(columnList);
 	}
-	
+
+	@Override
+	public boolean isRunning() {
+		return false;
+	}
+
+	@Override
+	public void start() {
+	}
+
+	@Override
+	public void stop() {
+		eventPersister.stop();
+	}
+
 }

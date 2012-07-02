@@ -12,9 +12,10 @@
 
 	<properties>
 		<jdk.version>1.6</jdk.version>
-		<aspectj.version>[1.6.9.M2,1.6.12]</aspectj.version>
+		<aspectj.version>1.6.10</aspectj.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<slf4j.version>1.6.1</slf4j.version>
+		<logback.version>1.0.3</logback.version>
 		<spring.version>3.0.5.RELEASE</spring.version>
 		<hibernate.version>4.0.2.GA</hibernate.version>
 		<camel.version>2.8.3</camel.version>
@@ -41,8 +42,8 @@
 			<artifactId>junit</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.mockito</groupId>
@@ -50,20 +51,21 @@
 		</dependency>
 	</dependencies>
 
+<!-- 
 	<repositories>
 		<repository>
 			<id>central</id>
 			<name>central</name>
 			<url>http://repo1.maven.org/maven2/</url>
 		</repository>
-	 
+
 		<repository>
 			<id>riptano</id>
 			<name>riptano</name>
 			<url>http://mvn.riptano.com/content/repositories/public/</url>
 		</repository>
 	</repositories>
-	
+
 	<distributionManagement>
 		<repository>
 			<id>nordija-releases</id>
@@ -76,7 +78,8 @@
 			<url>http://moldau.nordija.com:7070/content/repositories/snapshots</url>
 		</snapshotRepository>
 	</distributionManagement>
-
+ -->
+ 
 	<dependencyManagement>
 		<dependencies>
 			<!-- test dependencies -->
@@ -118,7 +121,7 @@
 			<dependency>
 				<groupId>org.javatuples</groupId>
 				<artifactId>javatuples</artifactId>
-				<version>1.1</version>
+				<version>1.2</version>
 			</dependency>
 			<dependency>
 				<groupId>org.apache.mina</groupId>
@@ -151,6 +154,21 @@
 					</exclusion>
 				</exclusions>
 			</dependency>
+			<dependency>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-core</artifactId>
+				<version>${logback.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-classic</artifactId>
+				<version>${logback.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-access</artifactId>
+				<version>${logback.version}</version>
+			</dependency>			
 			<dependency>
 				<groupId>org.slf4j</groupId>
 				<artifactId>slf4j-api</artifactId>
@@ -568,7 +586,6 @@
 							<execution>
 								<goals>
 									<goal>compile</goal>
-									<goal>test-compile</goal>
 								</goals>
 							</execution>
 						</executions>
@@ -594,7 +611,6 @@
 						<execution>
 							<goals>
 								<goal>compile</goal>
-								<goal>test-compile</goal>
 							</goals>
 						</execution>
 					</executions>

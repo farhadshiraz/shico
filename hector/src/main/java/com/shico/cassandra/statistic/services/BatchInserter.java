@@ -1,17 +1,16 @@
 package com.shico.cassandra.statistic.services;
 
 import java.nio.ByteBuffer;
-import java.sql.Date;
 import java.util.List;
 
 import me.prettyprint.hector.api.beans.HColumn;
 
-public interface BatchInserter {
+import org.springframework.context.Lifecycle;
+
+public interface BatchInserter extends Lifecycle{
 	void doBatchInsert();
-	void addStringColumn(String name, String value);
-	void addLongColumn(String name, long value);
-	void addDateColumn(String name, long value);
-	void addDateColumn(String name, Date value);
+	void newRow(BatchRow row);
+
 	String columnValueAsString(HColumn<String, ByteBuffer> column);
 	String columnsAsString(List<HColumn<String, ByteBuffer>> columnList);
 }
